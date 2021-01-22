@@ -104,4 +104,4 @@ def cost_function(A, phi, t):
     N = (A.shape[0] - 1) * 2
     w = 2.0 * np.pi * np.arange(0, A.shape[0]) / N
 
-    return np.sum(A * np.cos(w * t * phi)) / N
+    return np.sum(A * np.cos(w * t * phi))

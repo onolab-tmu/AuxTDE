@@ -54,7 +54,7 @@ if __name__ == "__main__":
     print("----------------------------")
     print(
         "true_tdoa: {}\n est_naiv: {}\n est_para: {}\n est_saux: {}\n est_maux: {}\n".format(
-            true_tdoa[1], est_naiv[1], est_para[1], est_saux[1, -1], est_maux[1, -1]
+            true_tdoa, est_naiv, est_para, est_saux[:, -1], est_maux[:, -1]
         )
     )
 
