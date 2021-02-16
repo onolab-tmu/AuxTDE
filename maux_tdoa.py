@@ -137,6 +137,30 @@ def cost_function(tdiff, A, phi, omega):
     )
 
 
+def auxiliary_function(tdiff, tdiff_0, A, phi, omega):
+    tdiff = tdiff[:, :, np.newaxis]
+    tdiff_0 = tdiff_0[:, :, np.newaxis]
+    omega = omega[np.newaxis, np.newaxis, :]
+
+    # phase estimates (auxiliary variables)
+    theta = omega * tdiff_0 + phi
+
+    # round to within 2pi
+    n = np.round(theta / (2 * np.pi))
+    theta -= 2 * n * np.pi
+
+    Q = np.sum(
+        A
+        * (
+            (-0.5 * np.sinc(theta / np.pi)) * (omega * tdiff + phi - 2 * n * np.pi) ** 2
+            + np.cos(theta)
+            + theta * np.sin(theta) / 2
+        )
+    )
+
+    return Q
+
+
 def simple_maux_tdoa(x, frlen=None, n_iter=10, ret_all=False):
     n_samples, n_ch = x.shape
     tau = np.zeros([n_ch, n_iter + 1])
