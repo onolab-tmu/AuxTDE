@@ -77,7 +77,7 @@ def maux_tdoa(x, frlen=None, frsft=None, n_iter=10, tau0=None, ret_all=False):
     cost[0] = cost_function(tdiff, A, phi, w)
 
     # iterative updates
-    for iter in range(0, n_iter):
+    for iter in range(1, n_iter + 1):
         # update phase estimates (auxiliary variables)
         theta = w[np.newaxis, np.newaxis, :] * tdiff[:, :, np.newaxis] + phi
 
@@ -92,26 +92,21 @@ def maux_tdoa(x, frlen=None, frsft=None, n_iter=10, tau0=None, ret_all=False):
         )
         c = w * np.sum(B * theta, axis=0)
 
-        tau[1:, iter + 1] = tau[1:, iter] - np.linalg.inv(
+        tau[1:, iter] = tau[1:, iter - 1] - np.linalg.inv(
             np.sum(C[1:, 1:, :], axis=2)
         ) @ (np.sum(c[1:, :], axis=1))
-        tdiff = tau[:, iter + 1, np.newaxis].T - tau[:, iter + 1, np.newaxis]
+        tdiff = tau[:, iter, np.newaxis].T - tau[:, iter, np.newaxis]
 
         # store the cost function
-        cost[iter + 1] = cost_function(tdiff, A, phi, w)
-
-    # tdiff = tau[:, -1, np.newaxis].T - tau[:, -1, np.newaxis]
-    # cost[-1] = cost_function(tdiff, A, phi, w)
+        cost[iter] = cost_function(tdiff, A, phi, w)
 
     return tau if ret_all else tau[:, -1]
 
 
 def calc_SCM(X):
-    n_ch, n_frame, n_freq = X.shape
-    V = np.zeros([n_ch, n_ch, n_freq], dtype=complex)
-    for f in range(n_freq):
-        V[:, :, f] = X[:, :, f] @ X[:, :, f].conj().T
-    return V / n_frame
+    X = X.transpose(2, 0, 1)
+    V = X @ X.conj().swapaxes(1, 2)
+    return V.transpose(1, 2, 0) / X.shape[1]
 
 
 def init_tau(x, is_naive=False):
@@ -121,12 +116,13 @@ def init_tau(x, is_naive=False):
     tau_naive = np.zeros([n_ch])
 
     # compute cross-spectrum
-    X1 = np.fft.rfft(x[:, 0])
-    for ch in range(1, n_ch):
-        X2 = np.fft.rfft(x[:, ch])
+    X = np.fft.rfft(x, axis=0)
 
-        # compute time delay estimates
-        tau[ch], tau_naive[ch] = tdoa.GCC_with_parafit(X1 * np.conj(X2), ret_GCC=True)
+    # compute time delay estimates
+    for ch in range(1, n_ch):
+        tau[ch], tau_naive[ch] = tdoa.GCC_with_parafit_old(
+            X[:, 0] * np.conj(X[:, ch]), ret_GCC=True
+        )
 
     return tau_naive if is_naive else tau
 
