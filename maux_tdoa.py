@@ -3,9 +3,12 @@ import numpy as np
 from functions.STFT import mSTFT
 import tdoa
 import aux_tdoa
+from scipy.linalg import eigh
 
 
-def maux_tdoa(x, frlen=None, frsft=None, n_iter=10, tau0=None, ret_all=False):
+def maux_tdoa(
+    x, frlen=None, frsft=None, n_iter=10, n_epoch=3, tau0=None, ret_all=False, tt=None
+):
     """
     Auxilliary function based sub-sample time delays estimation.
 
@@ -30,7 +33,6 @@ def maux_tdoa(x, frlen=None, frsft=None, n_iter=10, tau0=None, ret_all=False):
     ----------
     The sub-sample precision time delay estimates
     """
-
     # Check error and get parameters
     n_samples, n_ch = x.shape
     if n_samples < n_ch:
@@ -57,48 +59,68 @@ def maux_tdoa(x, frlen=None, frsft=None, n_iter=10, tau0=None, ret_all=False):
     A /= frlen
     A[:, :, 1:-1] *= 2
 
-    # main
+    # est tau main
     # initialization
     theta = np.zeros([n_ch, n_ch, n_freq])
     B = np.zeros([n_ch, n_ch, n_freq])
     C = np.zeros([n_ch, n_ch, n_freq])
     c = np.zeros([n_ch, n_freq])
+    fixed_a = np.ones([n_ch, 1, n_freq])
 
     # initialization of time delays
     tau = np.zeros([n_ch, n_iter + 1])
     if tau0 is None:
-        tau[:, 0] = init_tau(x)
+        tau[:, -1] = init_tau(x)
     else:
-        tau[:, 0] = tau0
-    tdiff = tau[:, 0, np.newaxis].T - tau[:, 0, np.newaxis]
+        tau[:, -1] = tau0
 
-    # compute cost function
-    cost = np.zeros([n_iter + 1])
-    cost[0] = cost_function(tdiff, A, phi, w)
+    for epoch in range(n_epoch):
+        tau[:, 0] = tau[:, -1]
+        tdiff = tau[:, 0, np.newaxis].T - tau[:, 0, np.newaxis]
 
-    # iterative updates
-    for iter in range(1, n_iter + 1):
-        # update phase estimates (auxiliary variables)
+        # compute cost function
+        cost = np.zeros([n_iter + 1])
+        cost[0] = cost_function(tdiff, A, phi, w)
+
+        # iterative updates
+        for iter in range(1, n_iter + 1):
+            # update phase estimates (auxiliary variables)
+            theta = w[np.newaxis, np.newaxis, :] * tdiff[:, :, np.newaxis] + phi
+
+            # round to within 2pi
+            theta -= np.round(theta / (2 * np.pi)) * 2 * np.pi
+
+            # update time delay estimates
+            tmp = np.zeros([n_ch, n_ch, n_freq])
+            for k in range(n_freq):
+                tmp[:, :, k] = np.real(fixed_a[:, :, k]) @ np.real(fixed_a[:, :, k].T)
+            B = tmp * A * np.sinc(theta / np.pi)
+            C = w2 * (
+                np.identity(n_ch)[:, :, np.newaxis]
+                * np.sum(B, axis=0)[:, np.newaxis, :]
+                - B
+            )
+            c = w * np.sum(B * theta, axis=0)
+
+            tau[1:, iter] = tau[1:, iter - 1] - np.linalg.inv(
+                np.sum(C[1:, 1:, :], axis=2)
+            ) @ (np.sum(c[1:, :], axis=1))
+            tdiff = tau[:, iter, np.newaxis].T - tau[:, iter, np.newaxis]
+
+            # store the cost function
+            cost[iter] = cost_function(tdiff, A, phi, w)
+
+        fixed_tau = tau[:, -1]
+
+        # a main
+        tdiff = fixed_tau[:, np.newaxis].T - fixed_tau[:, np.newaxis]
         theta = w[np.newaxis, np.newaxis, :] * tdiff[:, :, np.newaxis] + phi
-
-        # round to within 2pi
-        theta -= np.round(theta / (2 * np.pi)) * 2 * np.pi
-
-        # update time delay estimates
-        B = A * np.sinc(theta / np.pi)
-        C = w2 * (
-            np.identity(n_ch)[:, :, np.newaxis] * np.sum(B, axis=0)[:, np.newaxis, :]
-            - B
-        )
-        c = w * np.sum(B * theta, axis=0)
-
-        tau[1:, iter] = tau[1:, iter - 1] - np.linalg.inv(
-            np.sum(C[1:, 1:, :], axis=2)
-        ) @ (np.sum(c[1:, :], axis=1))
-        tdiff = tau[:, iter, np.newaxis].T - tau[:, iter, np.newaxis]
-
-        # store the cost function
-        cost[iter] = cost_function(tdiff, A, phi, w)
+        Vp = np.abs(V) * np.exp(-1 * 1j * theta)
+        for k in range(n_freq):
+            _eig_val, eig_vec = eigh(
+                np.real(Vp[:, :, k]), subset_by_index=[n_ch - 1, n_ch - 1]
+            )
+            fixed_a[:, :, k] = eig_vec / eig_vec[0, 0]
 
     return tau if ret_all else tau[:, -1]
 
@@ -120,7 +142,7 @@ def init_tau(x, is_naive=False):
 
     # compute time delay estimates
     for ch in range(1, n_ch):
-        tau[ch], tau_naive[ch] = tdoa.GCC_with_parafit_old(
+        tau[ch], tau_naive[ch] = tdoa.GCC_with_parafit(
             X[:, 0] * np.conj(X[:, ch]), ret_GCC=True
         )
 
