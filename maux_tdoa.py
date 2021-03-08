@@ -3,7 +3,6 @@ import numpy as np
 from functions.STFT import mSTFT
 import tdoa
 import aux_tdoa
-from scipy.linalg import eigh
 
 
 def maux_tdoa(
@@ -47,8 +46,8 @@ def maux_tdoa(
 
     # STFT
     wnd = np.ones(frlen)
-    X = mSTFT(x, frlen, frsft, wnd, zp=False)
-    n_ch, n_frame, n_freq = X.shape
+    X = mSTFT(x, frlen, frsft, wnd, zp=False).transpose(2, 0, 1)
+    n_freq, n_ch, n_frame = X.shape
 
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
@@ -57,15 +56,11 @@ def maux_tdoa(
     A = np.abs(V)
     phi = np.angle(V / A)
     A /= frlen
-    A[:, :, 1:-1] *= 2
+    A[1:-1, :, :] *= 2
 
     # est tau main
     # initialization
-    theta = np.zeros([n_ch, n_ch, n_freq])
-    B = np.zeros([n_ch, n_ch, n_freq])
-    C = np.zeros([n_ch, n_ch, n_freq])
-    c = np.zeros([n_ch, n_freq])
-    fixed_a = np.ones([n_ch, 1, n_freq])
+    fixed_a = np.ones([n_freq, n_ch, 1])
 
     # initialization of time delays
     tau = np.zeros([n_ch, n_iter + 1])
@@ -85,26 +80,23 @@ def maux_tdoa(
         # iterative updates
         for iter in range(1, n_iter + 1):
             # update phase estimates (auxiliary variables)
-            theta = w[np.newaxis, np.newaxis, :] * tdiff[:, :, np.newaxis] + phi
+            theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
 
             # round to within 2pi
             theta -= np.round(theta / (2 * np.pi)) * 2 * np.pi
 
             # update time delay estimates
-            tmp = np.zeros([n_ch, n_ch, n_freq])
-            for k in range(n_freq):
-                tmp[:, :, k] = np.real(fixed_a[:, :, k]) @ np.real(fixed_a[:, :, k].T)
-            B = tmp * A * np.sinc(theta / np.pi)
-            C = w2 * (
-                np.identity(n_ch)[:, :, np.newaxis]
-                * np.sum(B, axis=0)[:, np.newaxis, :]
+            B = fixed_a @ fixed_a.swapaxes(1, 2) * A * np.sinc(theta / np.pi)
+            C = w2[:, np.newaxis, np.newaxis] * (
+                np.identity(n_ch)[np.newaxis, :, :]
+                * np.sum(B, axis=1)[:, np.newaxis, :]
                 - B
             )
-            c = w * np.sum(B * theta, axis=0)
+            c = w[:, np.newaxis] * np.sum(B * theta, axis=1)
 
             tau[1:, iter] = tau[1:, iter - 1] - np.linalg.inv(
-                np.sum(C[1:, 1:, :], axis=2)
-            ) @ (np.sum(c[1:, :], axis=1))
+                np.sum(C[:, 1:, 1:], axis=0)
+            ) @ (np.sum(c[:, 1:], axis=0))
             tdiff = tau[:, iter, np.newaxis].T - tau[:, iter, np.newaxis]
 
             # store the cost function
@@ -114,21 +106,19 @@ def maux_tdoa(
 
         # a main
         tdiff = fixed_tau[:, np.newaxis].T - fixed_tau[:, np.newaxis]
-        theta = w[np.newaxis, np.newaxis, :] * tdiff[:, :, np.newaxis] + phi
+        theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
         Vp = np.abs(V) * np.exp(-1 * 1j * theta)
-        for k in range(n_freq):
-            _eig_val, eig_vec = eigh(
-                np.real(Vp[:, :, k]), subset_by_index=[n_ch - 1, n_ch - 1]
-            )
-            fixed_a[:, :, k] = eig_vec / eig_vec[0, 0]
+        _eig_val, eig_vec = np.linalg.eigh(np.real(Vp))
+        fixed_a = (
+            eig_vec[:, :, -1, np.newaxis] / eig_vec[:, 0, -1, np.newaxis, np.newaxis]
+        )
 
     return tau if ret_all else tau[:, -1]
 
 
 def calc_SCM(X):
-    X = X.transpose(2, 0, 1)
     V = X @ X.conj().swapaxes(1, 2)
-    return V.transpose(1, 2, 0) / X.shape[1]
+    return V / X.shape[2]
 
 
 def init_tau(x, is_naive=False):
@@ -151,14 +141,14 @@ def init_tau(x, is_naive=False):
 
 def cost_function(tdiff, A, phi, omega):
     return np.sum(
-        A * np.cos(omega[np.newaxis, np.newaxis, :] * tdiff[:, :, np.newaxis] + phi)
+        A * np.cos(omega[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi)
     )
 
 
 def auxiliary_function(tdiff, tdiff_0, A, phi, omega):
-    tdiff = tdiff[:, :, np.newaxis]
-    tdiff_0 = tdiff_0[:, :, np.newaxis]
-    omega = omega[np.newaxis, np.newaxis, :]
+    tdiff = tdiff[np.newaxis, :, :]
+    tdiff_0 = tdiff_0[np.newaxis, :, :]
+    omega = omega[:, np.newaxis, np.newaxis]
 
     # phase estimates (auxiliary variables)
     theta = omega * tdiff_0 + phi
