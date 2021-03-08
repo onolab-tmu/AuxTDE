@@ -12,25 +12,36 @@ from functions.STFT import mSTFT
 def parse_cmd_line_arguments():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
-        "-i", "--init_tau", type=str, default="1.5 3",
+        "-i",
+        "--init_tau",
+        help="Initial time delay estimates",
+        type=str,
+        default="1.5 3",
     )
     parser.add_argument(
-        "-m", "--n_mesh", type=int, default=50,
+        "-m", "--n_mesh", help="# of mesh for plot", type=int, default=50,
     )
     parser.add_argument(
-        "-d", "--divides_obj", action="store_true",
+        "-d",
+        "--divides_obj",
+        help="With this argument, graphs are divided corresponding to the vertex of the auxiliary function",
+        action="store_true",
     )
     parser.add_argument(
-        "-o", "--out_path", type=str, default=None,
+        "-o", "--out_path", type=str, help="Path for save figure", default=None,
     )
     parser.add_argument(
-        "-a", "--azim", type=int, default=-30,
+        "-a", "--azim", help="Azimuth of 3D plot", type=int, default=-30,
     )
     parser.add_argument(
-        "-e", "--elev", type=int, default=25,
+        "-e", "--elev", help="Elevation of 3D plot", type=int, default=25,
     )
     parser.add_argument(
-        "-w", "--n_worker", type=int, default=4,
+        "-w",
+        "--n_worker",
+        help="# of workers for parallel processing",
+        type=int,
+        default=4,
     )
     parser.add_argument(
         "-z", "--z_label_pos", type=float, default=0.7,
@@ -38,7 +49,7 @@ def parse_cmd_line_arguments():
     return parser.parse_args()
 
 
-def costfun(args):
+def cost_function(args):
     x = args[0]
     y = args[1]
     tau = np.array([0, x, y])
@@ -109,18 +120,16 @@ if __name__ == "__main__":
 
     ## Objective function
     # set range
-    tau_range_1 = np.linspace(-3, 5, args.n_mesh)
-    tau_range_2 = np.linspace(-3, 5, args.n_mesh)
-    n_row = len(tau_range_2)
-    n_col = len(tau_range_1)
-
-    # set data and indices
-    cost = np.zeros([n_row, n_col])
-    X, Y = np.meshgrid(tau_range_1, tau_range_2)
+    range_1 = np.linspace(-3, 5, args.n_mesh)
+    range_2 = np.linspace(-3, 5, args.n_mesh)
+    n_row = len(range_2)
+    n_col = len(range_1)
+    X, Y = np.meshgrid(range_1, range_2)
 
     # compute objective function
+    cost = np.zeros([n_row, n_col])
     with Pool(args.n_worker, initializer=mp_init) as p:
-        cost = p.map(costfun, list(zip(np.ravel(X), np.ravel(Y))))
+        cost = p.map(cost_function, list(zip(np.ravel(X), np.ravel(Y))))
     cost = np.array(cost).reshape(n_col, n_row)
 
     ## auxiliary function
@@ -130,26 +139,12 @@ if __name__ == "__main__":
         init_tau = np.append(init_tau, float(i))
     init_tau = np.array(init_tau)
 
-    # set range
-    q_range_1 = np.linspace(-1, 4, args.n_mesh)
-    q_range_2 = np.linspace(-3, 5, args.n_mesh)
-    q_range_1 = np.linspace(-3, 5, args.n_mesh)
-    q_range_2 = np.linspace(-3, 5, args.n_mesh)
-    n_qrow = len(q_range_2)
-    n_qcol = len(q_range_1)
-
-    # set data and indices
-    af = np.zeros([n_qrow, n_qcol])
-    qX, qY = np.meshgrid(q_range_1, q_range_2)
-
     # compute auxiliary function
+    af = np.zeros([n_row, n_col])
     with Pool(args.n_worker, initializer=mp_init) as p:
-        af = p.map(auxiliary_function, list(zip(np.ravel(qX), np.ravel(qY))))
-    af = np.array(af).reshape(n_qcol, n_qrow)
+        af = p.map(auxiliary_function, list(zip(np.ravel(X), np.ravel(Y))))
+    af = np.array(af).reshape(n_col, n_row)
     af *= af > 0
-
-    # compute auxiliary function at initial estimate
-    afi = auxiliary_function(init_tau[1:])
 
     ## plot
     # set colors
@@ -158,7 +153,6 @@ if __name__ == "__main__":
     if args.divides_obj:
         colors_1[X > init_tau[1]] = "#0000ff00"
         colors_2[X > init_tau[1]] = "#0000ff00"
-
     colors_2[af <= 0] = "#ff000000"
 
     # plot
@@ -175,9 +169,8 @@ if __name__ == "__main__":
         linewidths=0,
     )
     ax.plot_surface(
-        qX, qY, af, facecolors=colors_2, rcount=args.n_mesh, ccount=args.n_mesh
+        X, Y, af, facecolors=colors_2, rcount=args.n_mesh, ccount=args.n_mesh
     )
-    # ax.scatter3D(init_tau[1], init_tau[2], afi, marker="v", s=200, c="k")
 
     ax.set_xlabel(r"$\tau_2$", fontsize=20)
     ax.set_ylabel(r"$\tau_1$", fontsize=20)
@@ -197,7 +190,7 @@ if __name__ == "__main__":
 
     ax.view_init(azim=args.azim, elev=args.elev)
 
-    # save of show
+    # save or show
     if args.out_path is not None:
         fig.savefig(args.out_path, dpi=300)
     else:
