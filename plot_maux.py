@@ -53,19 +53,16 @@ def cost_function(args):
     x = args[0]
     y = args[1]
     tau = np.array([0, x, y])
-    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
-    return maux_tdoa.cost_function(tdiff, A, phi, w)
+
+    return maux_tdoa.cost_function(a, tau, A, phi, w)
 
 
 def auxiliary_function(args):
     x = args[0]
     y = args[1]
-
     tau = np.array([0, x, y])
-    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
-    init_tdiff = init_tau[:, np.newaxis].T - init_tau[:, np.newaxis]
 
-    return maux_tdoa.auxiliary_function(tdiff, init_tdiff, A, phi, w)
+    return maux_tdoa.auxiliary_function(a, tau, init_tau, A, phi, w)
 
 
 def mp_init():
@@ -78,6 +75,7 @@ if __name__ == "__main__":
     np.random.seed(577)
     args = parse_cmd_line_arguments()
 
+    global a
     global A
     global w
     global phi
@@ -106,8 +104,8 @@ if __name__ == "__main__":
 
     # STFT
     wnd = np.ones(frlen)
-    X = mSTFT(x, frlen, frsft, wnd, zp=False)
-    n_ch, n_frame, n_freq = X.shape
+    X = mSTFT(x, frlen, frsft, wnd, zp=False).transpose(2, 0, 1)
+    n_freq, n_ch, n_frame = X.shape
 
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
@@ -117,6 +115,7 @@ if __name__ == "__main__":
     phi = np.angle(V / A)
     A /= frlen
     A[:, :, 1:-1] *= 2
+    a = np.ones([n_freq, n_ch, 1])
 
     ## Objective function
     # set range

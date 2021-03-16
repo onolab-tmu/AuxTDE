@@ -5,9 +5,7 @@ import tdoa
 import aux_tdoa
 
 
-def maux_tdoa(
-    x, frlen=None, frsft=None, n_iter=10, n_epoch=3, tau0=None, ret_all=False, tt=None
-):
+def maux_tdoa(x, frlen=None, frsft=None, n_iter=10, n_epoch=3, tau0=None):
     """
     Auxilliary function based sub-sample time delays estimation.
 
@@ -24,14 +22,12 @@ def maux_tdoa(
     tau0: float, optional
         The initial estimates of the time delay.
         If None, GCC with quadratic interpolation is used.
-    ret_all: bool, optional
-        If True, return the estimates at all iterations,
-        else return only the final estimates
 
     return
     ----------
     The sub-sample precision time delay estimates
     """
+
     # Check error and get parameters
     n_samples, n_ch = x.shape
     if n_samples < n_ch:
@@ -51,72 +47,75 @@ def maux_tdoa(
 
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
-    w2 = w ** 2
     V = calc_SCM(X)
     A = np.abs(V)
     phi = np.angle(V / A)
     A /= frlen
     A[1:-1, :, :] *= 2
 
-    # est tau main
+    ## main
     # initialization
-    fixed_a = np.ones([n_freq, n_ch, 1])
-
-    # initialization of time delays
-    tau = np.zeros([n_ch, n_iter + 1])
+    a = np.ones([n_freq, n_ch, 1])
+    tau = np.zeros([n_iter + 1, n_ch])
     if tau0 is None:
-        tau[:, -1] = init_tau(x)
+        tau[-1, :] = init_tau(x)
     else:
-        tau[:, -1] = tau0
+        tau[-1, :] = tau0
 
+    # main
     for epoch in range(n_epoch):
-        tau[:, 0] = tau[:, -1]
-        tdiff = tau[:, 0, np.newaxis].T - tau[:, 0, np.newaxis]
-
-        # compute cost function
-        cost = np.zeros([n_iter + 1])
-        cost[0] = cost_function(tdiff, A, phi, w)
-
-        # iterative updates
+        # iterative updates for time delay estimation
+        tau[0, :] = tau[-1, :]
         for iter in range(1, n_iter + 1):
-            # update phase estimates (auxiliary variables)
-            theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
+            tau[iter, 1:] = update_tau(a, tau[iter - 1, :], w, A, phi)
 
-            # round to within 2pi
-            theta -= np.round(theta / (2 * np.pi)) * 2 * np.pi
+        # amplitude estimation
+        a = update_a(tau[-1, :], w, A, phi)
 
-            # update time delay estimates
-            B = fixed_a @ fixed_a.swapaxes(1, 2) * A * np.sinc(theta / np.pi)
-            C = w2[:, np.newaxis, np.newaxis] * (
-                np.identity(n_ch)[np.newaxis, :, :]
-                * np.sum(B, axis=1)[:, np.newaxis, :]
-                - B
-            )
-            c = w[:, np.newaxis] * np.sum(B * theta, axis=1)
+    return a, tau[-1, :]
 
-            tau[1:, iter] = tau[1:, iter - 1] - np.linalg.inv(
-                np.sum(C[:, 1:, 1:], axis=0)
-            ) @ (np.sum(c[:, 1:], axis=0))
-            tdiff = tau[:, iter, np.newaxis].T - tau[:, iter, np.newaxis]
 
-            # store the cost function
-            cost[iter] = cost_function(tdiff, A, phi, w)
+def update_a(tau, w, A, phi):
+    # update auxiliary variables
+    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
+    theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
 
-        fixed_tau = tau[:, -1]
+    # solve eigenvalue decomposition
+    _eig_val, eig_vec = np.linalg.eigh(np.real(A * np.exp(-1 * 1j * theta)))
 
-        # a main
-        tdiff = fixed_tau[:, np.newaxis].T - fixed_tau[:, np.newaxis]
-        theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
-        Vp = np.abs(V) * np.exp(-1 * 1j * theta)
-        _eig_val, eig_vec = np.linalg.eigh(np.real(Vp))
-        fixed_a = (
-            eig_vec[:, :, -1, np.newaxis] / eig_vec[:, 0, -1, np.newaxis, np.newaxis]
-        )
+    # normalization
+    a = eig_vec[:, :, -1, np.newaxis] / eig_vec[:, 0, -1, np.newaxis, np.newaxis]
 
-    return tau if ret_all else tau[:, -1]
+    return a
+
+
+def update_tau(a, tau, w, A, phi):
+    w2 = w ** 2
+    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
+    n_ch = tau.shape[0]
+
+    # update phase estimates (auxiliary variables)
+    theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
+
+    # round to within 2pi
+    theta -= np.round(theta / (2 * np.pi)) * 2 * np.pi
+
+    # update time delay estimates
+    B = a @ a.swapaxes(1, 2) * A * np.sinc(theta / np.pi)
+    C = w2[:, np.newaxis, np.newaxis] * (
+        np.identity(n_ch)[np.newaxis, :, :] * np.sum(B, axis=1)[:, np.newaxis, :] - B
+    )
+    c = w[:, np.newaxis] * np.sum(B * theta, axis=1)
+
+    retval = tau[1:] - np.linalg.inv(np.sum(C[:, 1:, 1:], axis=0)) @ (
+        np.sum(c[:, 1:], axis=0)
+    )
+
+    return retval
 
 
 def calc_SCM(X):
+    # compute spatial covariance matrix
     V = X @ X.conj().swapaxes(1, 2)
     return V / X.shape[2]
 
@@ -139,28 +138,34 @@ def init_tau(x, is_naive=False):
     return tau_naive if is_naive else tau
 
 
-def cost_function(tdiff, A, phi, omega):
+def cost_function(a, tau, A, phi, w):
+    amat = a * a.swapaxes(1, 2)
+    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
     return np.sum(
-        A * np.cos(omega[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi)
+        amat * A * np.cos(w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi)
     )
 
 
-def auxiliary_function(tdiff, tdiff_0, A, phi, omega):
+def auxiliary_function(a, tau, init_tau, A, phi, w):
+    amat = a * a.swapaxes(1, 2)
+    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
+    tdiff_0 = init_tau[:, np.newaxis].T - init_tau[:, np.newaxis]
     tdiff = tdiff[np.newaxis, :, :]
     tdiff_0 = tdiff_0[np.newaxis, :, :]
-    omega = omega[:, np.newaxis, np.newaxis]
+    w = w[:, np.newaxis, np.newaxis]
 
     # phase estimates (auxiliary variables)
-    theta = omega * tdiff_0 + phi
+    theta = w * tdiff_0 + phi
 
     # round to within 2pi
     n = np.round(theta / (2 * np.pi))
     theta -= 2 * n * np.pi
 
     Q = np.sum(
-        A
+        amat
+        * A
         * (
-            (-0.5 * np.sinc(theta / np.pi)) * (omega * tdiff + phi - 2 * n * np.pi) ** 2
+            (-0.5 * np.sinc(theta / np.pi)) * (w * tdiff + phi - 2 * n * np.pi) ** 2
             + np.cos(theta)
             + theta * np.sin(theta) / 2
         )

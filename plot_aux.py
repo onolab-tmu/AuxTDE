@@ -19,18 +19,10 @@ def parse_cmd_line_arguments():
         default="1.5",
     )
     parser.add_argument(
-        "-m",
-        "--n_mesh",
-        help="# of mesh for plot",
-        type=int,
-        default=300,
+        "-m", "--n_mesh", help="# of mesh for plot", type=int, default=300,
     )
     parser.add_argument(
-        "-o",
-        "--out_path",
-        type=str,
-        help="Path for save figure",
-        default=None,
+        "-o", "--out_path", type=str, help="Path for save figure", default=None,
     )
     parser.add_argument(
         "-w",
@@ -45,18 +37,15 @@ def parse_cmd_line_arguments():
 def cost_function(args):
     x = args[0]
     tau = np.array([0, x])
-    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
-    return maux_tdoa.cost_function(tdiff, A, phi, w)
+
+    return maux_tdoa.cost_function(a, tau, A, phi, w)
 
 
 def auxiliary_function(args):
     x = args[0]
-
     tau = np.array([0, x])
-    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
-    init_tdiff = init_tau[:, np.newaxis].T - init_tau[:, np.newaxis]
 
-    return maux_tdoa.auxiliary_function(tdiff, init_tdiff, A, phi, w)
+    return maux_tdoa.auxiliary_function(a, tau, init_tau, A, phi, w)
 
 
 def mp_init():
@@ -69,6 +58,7 @@ if __name__ == "__main__":
     np.random.seed(577)
     args = parse_cmd_line_arguments()
 
+    global a
     global A
     global w
     global phi
@@ -97,8 +87,8 @@ if __name__ == "__main__":
 
     # STFT
     wnd = np.ones(frlen)
-    X = mSTFT(x, frlen, frsft, wnd, zp=False)
-    n_ch, n_frame, n_freq = X.shape
+    X = mSTFT(x, frlen, frsft, wnd, zp=False).transpose(2, 0, 1)
+    n_freq, n_ch, n_frame = X.shape
 
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
@@ -108,6 +98,7 @@ if __name__ == "__main__":
     phi = np.angle(V / A)
     A /= frlen
     A[:, :, 1:-1] *= 2
+    a = np.ones([n_freq, n_ch, 1])
 
     ## Objective function
     # set range
@@ -136,9 +127,7 @@ if __name__ == "__main__":
     plt.xlabel(r"$\tau$", fontsize=20)
     plt.ylabel("Objective function", fontsize=18)
     plt.tick_params(labelsize=12)
-    plt.ylim(
-        0,
-    )
+    plt.ylim(0,)
 
     # save or show
     if args.out_path is not None:

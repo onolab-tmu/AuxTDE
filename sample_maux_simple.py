@@ -7,12 +7,10 @@ from functions.tictoc import tictoc
 if __name__ == "__main__":
     np.random.seed(577)
 
-    # parameters
+    # signal parameters
     l_sig = 2 ** 16
-    frlen = l_sig
-    n_iter = 30
     n_ch = 8
-    true_tdoa = 3 * np.random.random(n_ch - 1)
+    true_tdoa = 5 * np.random.random(n_ch - 1)
     true_tdoa = np.append(0, true_tdoa)
 
     # simulation
@@ -22,25 +20,27 @@ if __name__ == "__main__":
     freq = np.arange(0, l_sig // 2 + 1)
     w = 2 * np.pi * freq / l_sig
 
-    # delayed signal
+    # delayed signals
+    amp = np.random.random([l_sig // 2 + 1, n_ch]) + 0.5
     for ch in range(1, n_ch):
-        tmp = np.fft.rfft(x[:, 0]) * np.exp(1j * w * true_tdoa[ch])
+        tmp = amp[:, ch] * np.fft.rfft(x[:, 0]) * np.exp(1j * w * true_tdoa[ch])
         x[:, ch] = np.fft.irfft(tmp)
 
     # main
-    est_maux = maux_tdoa.maux_tdoa(x)
+    _a, tau = maux_tdoa.maux_tdoa(x)
 
     # deal with the minus time delay
-    mask = est_maux > (l_sig / 2)
-    est_maux -= l_sig * mask
+    mask = tau > (l_sig / 2)
+    tau -= l_sig * mask
+
+    # report
+    print("----------------------------")
+    print("true_tdoa: {}\n est_tdoa: {}\n".format(true_tdoa, tau))
 
     print("----------------------------")
-    print("true_tdoa: {}\n est_tdoa: {}\n".format(true_tdoa, est_maux))
+    err = np.abs(tau - true_tdoa)
+    print(f"error: {err}\n")
 
     print("----------------------------")
-    err_maux = np.abs(est_maux - true_tdoa)
-    print(f"error: {err_maux}\n")
-
-    print("----------------------------")
-    rmse_maux = np.sqrt(np.mean(err_maux ** 2))
-    print(f"rmse: {rmse_maux}")
+    rmse = np.sqrt(np.mean(err ** 2))
+    print(f"rmse: {rmse}")
