@@ -75,6 +75,67 @@ def maux_tdoa(x, frlen=None, frsft=None, n_iter=10, n_epoch=3, tau0=None):
     return a, tau[-1, :]
 
 
+def maux_tdoa_retall(x, frlen=None, frsft=None, n_iter=10, n_epoch=3, tau0=None):
+    """
+    maux_tdoa for analysis purpose
+
+    """
+
+    # Check error and get parameters
+    n_samples, n_ch = x.shape
+    if n_samples < n_ch:
+        x = x.T
+        n_samples, n_ch = x.shape
+
+    if frlen is None:
+        frlen = n_samples
+
+    if frsft is None:
+        frsft = frlen // 2
+
+    # STFT
+    wnd = np.ones(frlen)
+    X = mSTFT(x, frlen, frsft, wnd, zp=False).transpose(2, 0, 1)
+    n_freq, n_ch, n_frame = X.shape
+
+    # compute variables/parameters
+    w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
+    V = calc_SCM(X)
+    A = np.abs(V)
+    phi = np.angle(V / A)
+    A /= frlen
+    A[1:-1, :, :] *= 2
+
+    ## main
+    # initialization
+    a = np.ones([n_epoch + 1, n_freq, n_ch, 1])
+    tau = np.zeros([n_epoch + 1, n_iter + 1, n_ch])
+    cost = np.zeros([n_epoch + 1, n_iter + 1])
+    if tau0 is None:
+        tau[0, -1, :] = init_tau(x)
+    else:
+        tau[0, -1, :] = tau0
+
+    # main
+    for epoch in range(1, n_epoch + 1):
+        # iterative updates for time delay estimation
+        tau[epoch, 0, :] = tau[epoch - 1, -1, :]
+        cost[epoch, 0] = cost_function(a[epoch, :, :, :], tau[0, -1, :], A, phi, w)
+        for iter in range(1, n_iter + 1):
+            tau[epoch, iter, 1:] = update_tau(
+                a[epoch - 1, :, :, :], tau[epoch, iter - 1, :], w, A, phi
+            )
+            cost[epoch, iter] = cost_function(
+                a[epoch, :, :, :], tau[epoch, iter, :], A, phi, w
+            )
+
+        # amplitude estimation
+        a[epoch, :, :, :] = update_a(tau[epoch, -1, :], w, A, phi)
+        cost[epoch, -1] = cost_function(a[epoch, :, :, :], tau[epoch, -1, :], A, phi, w)
+
+    return a, tau, cost
+
+
 def update_a(tau, w, A, phi):
     # update auxiliary variables
     tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
