@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import tdoa
+
+import tde
 from functions.STFT import mSTFT
 
 
-def aux_tdoa(x, frlen=None, frsft=None, n_iter=10, t0=None, phat=False, ret_all=False):
+def aux_tde(x, frlen=None, frsft=None, n_iter=10, t0=None, phat=False, ret_all=False):
     """
     Auxilliary function based sub-sample time delay estimation for two signals.
     Ref: Kouei Yamaoka, Robin Scheibler, Nobutaka Ono, and Yukoh Wakabayashi,
@@ -73,7 +74,7 @@ def aux_tdoa(x, frlen=None, frsft=None, n_iter=10, t0=None, phat=False, ret_all=
     t = np.zeros([n_iter + 1])
     PHI = np.zeros([n_iter + 1])
     if t0 is None:
-        t[0] = tdoa.GCC_with_parafit(xspec)
+        t[0] = tde.GCC_with_parafit(xspec)
     else:
         t[0] = t0
     PHI[0] = cost_function(A, phi, t[0])

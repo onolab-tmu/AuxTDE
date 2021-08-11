@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-import maux_tdoa
-from functions.tictoc import tictoc
 
+import maux_tde
+from functions.tictoc import tictoc
 
 if __name__ == "__main__":
     np.random.seed(577)
@@ -27,19 +27,15 @@ if __name__ == "__main__":
         x[:, ch] = np.fft.irfft(tmp)
 
     # main
-    _a, tau = maux_tdoa.maux_tdoa(x)
+    tau = maux_tde.maux_tde(x)
 
-    # deal with the minus time delay
-    mask = tau > (l_sig / 2)
-    tau -= l_sig * mask
-
-    # report
+    # result
     print("----------------------------")
-    print("true_tdoa: {}\n est_tdoa: {}\n".format(true_tdoa, tau))
+    print("true_tdoa: {}\n est_tdoa: {}".format(true_tdoa, tau))
 
     print("----------------------------")
     err = np.abs(tau - true_tdoa)
-    print(f"error: {err}\n")
+    print(f"error: {err}")
 
     print("----------------------------")
     rmse = np.sqrt(np.mean(err ** 2))
