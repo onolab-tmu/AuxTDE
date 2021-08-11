@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-import numpy as np
 import argparse
 from multiprocessing import Pool
+
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.mplot3d import Axes3D
-import maux_tdoa
+
+import maux_tde
 from functions.STFT import mSTFT
 
 
@@ -54,7 +56,7 @@ def cost_function(args):
     y = args[1]
     tau = np.array([0, x, y])
 
-    return maux_tdoa.cost_function(a, tau, A, phi, w)
+    return maux_tde.cost_function(a, tau, A, phi, w)
 
 
 def auxiliary_function(args):
@@ -62,7 +64,7 @@ def auxiliary_function(args):
     y = args[1]
     tau = np.array([0, x, y])
 
-    return maux_tdoa.auxiliary_function(a, tau, init_tau, A, phi, w)
+    return maux_tde.auxiliary_function(a, tau, init_tau, A, phi, w)
 
 
 def mp_init():
@@ -110,7 +112,7 @@ if __name__ == "__main__":
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
     w2 = w ** 2
-    V = maux_tdoa.calc_SCM(X)
+    V = maux_tde.calc_SCM(X)
     A = np.abs(V)
     phi = np.angle(V / A)
     A /= frlen

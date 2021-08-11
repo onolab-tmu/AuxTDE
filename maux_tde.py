@@ -2,7 +2,6 @@
 import numpy as np
 
 import aux_tde
-import chk
 import tde
 from functions.STFT import mSTFT
 
@@ -77,7 +76,7 @@ def maux_tde(
     a = np.ones([n_freq, n_ch, 1]) / np.sqrt(n_ch)
     tau = np.zeros([n_iter_t + 1, n_ch])
     if tau0 is None:
-        tau[-1, :] = initialize_tau(x)
+        tau[-1, :] = init_tau(x)
     else:
         tau[-1, :] = tau0
 
@@ -146,7 +145,7 @@ def maux_tde_retall(
     tau = np.zeros([n_epoch + 1, n_iter_t + 1, n_ch])
     cost = np.zeros([n_epoch + 1, n_iter_t + n_iter_a + 2])
     if tau0 is None:
-        tau[0, -1, :] = initialize_tau(x)
+        tau[0, -1, :] = init_tau(x)
     else:
         tau[0, -1, :] = tau0
     cost[0, -1] = cost_function(a[0, 0, :, :, :], tau[0, -1, :], A, phi, w)
@@ -240,7 +239,7 @@ def mmeig(V, n_iter, a0):
     return a, J
 
 
-def mmeig_sum(V, n_iter, a0):
+def mmeig_mean(V, n_iter, a0):
     n_freq, n_ch = V.shape[0:2]
     Vsum = np.sum(V, axis=0) / n_freq
     a = np.ones([n_iter + 1, n_ch, 1])
@@ -279,7 +278,7 @@ def calc_SCM(X):
     return V / X.shape[2]
 
 
-def initialize_tau(x, is_naive=False):
+def init_tau(x, is_naive=False):
     # initialization
     n_samples, n_ch = x.shape
     tau = np.zeros([n_ch])
@@ -303,12 +302,12 @@ def cost_function(a, tau, A, phi, w):
     cost = np.sum(
         amat * A * np.cos(w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi)
     )
-    return cost / ((A.shape[0] - 1) * 2)
+    return cost
 
 
 def cost_function_mat(a, V):
     cost = np.sum(a.swapaxes(1, 2) @ V @ a)
-    return cost / ((V.shape[0] - 1) * 2)
+    return cost
 
 
 def auxiliary_function(a, tau, init_tau, A, phi, w):

@@ -1,22 +1,18 @@
 # -*- coding: utf-8 -*-
-import numpy as np
 import argparse
 from multiprocessing import Pool
+
 import matplotlib.pyplot as plt
-from matplotlib.ticker import ScalarFormatter
-from mpl_toolkits.mplot3d import Axes3D
-import maux_tdoa
+import numpy as np
+
+import maux_tde
 from functions.STFT import mSTFT
 
 
 def parse_cmd_line_arguments():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
-        "-i",
-        "--init_tau",
-        help="Initial time delay estimates",
-        type=str,
-        default="1.5",
+        "-i", "--init_tau", help="Initial time delay estimates", type=str, default="1",
     )
     parser.add_argument(
         "-m", "--n_mesh", help="# of mesh for plot", type=int, default=300,
@@ -38,14 +34,14 @@ def cost_function(args):
     x = args[0]
     tau = np.array([0, x])
 
-    return maux_tdoa.cost_function(a, tau, A, phi, w)
+    return maux_tde.cost_function(a, tau, A, phi, w)
 
 
 def auxiliary_function(args):
     x = args[0]
     tau = np.array([0, x])
 
-    return maux_tdoa.auxiliary_function(a, tau, init_tau, A, phi, w)
+    return maux_tde.auxiliary_function(a, tau, init_tau, A, phi, w)
 
 
 def mp_init():
@@ -93,7 +89,7 @@ if __name__ == "__main__":
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
     w2 = w ** 2
-    V = maux_tdoa.calc_SCM(X)
+    V = maux_tde.calc_SCM(X)
     A = np.abs(V)
     phi = np.angle(V / A)
     A /= frlen
@@ -128,6 +124,7 @@ if __name__ == "__main__":
     plt.ylabel("Objective function", fontsize=18)
     plt.tick_params(labelsize=12)
     plt.ylim(0,)
+    plt.subplots_adjust(left=0.15, bottom=0.12)
 
     # save or show
     if args.out_path is not None:

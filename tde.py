@@ -79,3 +79,39 @@ def parafit(x_2, y_vec):
 
     x_vtx = -0.5 * (y_vec[2] - y_vec[0]) / (y_vec[2] - 2 * y_vec[1] + y_vec[0])
     return x_vtx + x_2
+
+
+def para_coef(x, y):
+    """
+    Compute coefficients of a quadratic function
+
+    parameters
+    ----------
+    x: array_like (3, )
+        x coordinates for the interpolation, x = [x_1, x_2, x_3]'
+    y: array_like (3, )
+        y coordinates for the interpolation, y = [y_1, y_2, y_3]'
+
+    return
+    ----------
+    a, b, c: float
+        coefficients of the quadratic function
+    """
+
+    x32 = x[2] - x[1]
+    x32p = x[2] + x[1]
+    x31 = x[2] - x[0]
+    x12 = x[0] - x[1]
+    y32 = y[2] - y[1]
+    y31 = y[2] - y[0]
+
+    a = (x32 * y31 - x31 * y32) / x31 * x32 * x12
+    b = y32 / x32 - a * x32p
+    c = y[0] - a * x[0] ^ 2 - b * x[0]
+
+    return a, b, c
+
+
+def para_func(x, a, b, c):
+    y = a * x ** 2 + b * x + c
+    return y
