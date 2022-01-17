@@ -8,7 +8,7 @@ if __name__ == "__main__":
     np.random.seed(577)
 
     # signal parameters
-    l_sig = 2 ** 16
+    l_sig = 2 ** 12
     n_ch = 2
     true_tdoa = 5 * np.random.random(n_ch - 1)
     true_tdoa = np.append(0, true_tdoa)
@@ -48,14 +48,14 @@ if __name__ == "__main__":
     maux_amp = tictoc("maux_amp")
     maux_amp.tic()
     est_maux_amp = maux_tde.maux_tde(
-        x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch
+        x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch, average=False
     )
     maux_amp.toc()
 
     maux_mamp = tictoc("maux_mamp")
     maux_mamp.tic()
     est_maux_mamp = maux_tde.maux_tde(
-        x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch, mean_a=True
+        x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch, average=True
     )
     maux_mamp.toc()
 

@@ -8,7 +8,7 @@ if __name__ == "__main__":
     np.random.seed(577)
 
     # signal parameters
-    l_sig = 2 ** 16
+    l_sig = 2 ** 12
     n_ch = 8
     true_tdoa = 5 * np.random.random(n_ch - 1)
     true_tdoa = np.append(0, true_tdoa)
