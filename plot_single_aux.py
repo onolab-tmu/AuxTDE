@@ -5,7 +5,7 @@ from multiprocessing import Pool
 import matplotlib.pyplot as plt
 import numpy as np
 
-import maux_tde
+import AuxTDE
 from functions.STFT import mSTFT
 
 
@@ -34,14 +34,14 @@ def cost_function(args):
     x = args[0]
     tau = np.array([0, x])
 
-    return maux_tde.cost_function(a, tau, A, phi, w)
+    return AuxTDE.cost_function(a, tau, A, phi, w)
 
 
 def auxiliary_function(args):
     x = args[0]
     tau = np.array([0, x])
 
-    return maux_tde.auxiliary_function(a, tau, init_tau, A, phi, w)
+    return AuxTDE.auxiliary_function(a, tau, init_tau, A, phi, w)
 
 
 def mp_init():
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
     w2 = w ** 2
-    V = maux_tde.calc_SCM(X)
+    V = AuxTDE.calc_SCM(X)
     A = np.abs(V)
     phi = np.angle(V / A)
     A /= frlen

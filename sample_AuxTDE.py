@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-import maux_tde
+import AuxTDE
 from functions.tictoc import tictoc
 
 if __name__ == "__main__":
     np.random.seed(577)
 
     # signal parameters
-    l_sig = 2 ** 12
-    n_ch = 2
+    l_sig = 2 ** 14
+    n_ch = 8
     true_tdoa = 5 * np.random.random(n_ch - 1)
     true_tdoa = np.append(0, true_tdoa)
 
@@ -32,29 +32,29 @@ if __name__ == "__main__":
         x[:, ch] = np.fft.irfft(tmp)
 
     # main
-    est_naiv = maux_tde.init_tau(x, is_naive=True)
-    est_para = maux_tde.init_tau(x)
+    est_naiv = AuxTDE.init_tau(x, is_naive=True)
+    est_para = AuxTDE.init_tau(x)
 
     saux = tictoc("saux")
     saux.tic()
-    est_saux = maux_tde.simple_maux_tde(x, n_iter=n_iter_t)
+    est_saux = AuxTDE.PW_AuxTDE(x, n_iter=n_iter_t)
     saux.toc()
 
     maux = tictoc("maux")
     maux.tic()
-    est_maux = maux_tde.maux_tde(x, n_iter_t=n_iter_t, n_iter_a=1, n_epoch=1)
+    est_maux = AuxTDE.AuxTDE(x, n_iter_t=n_iter_t, n_iter_a=1, n_epoch=1)
     maux.toc()
 
     maux_amp = tictoc("maux_amp")
     maux_amp.tic()
-    est_maux_amp = maux_tde.maux_tde(
+    est_maux_amp = AuxTDE.AuxTDE(
         x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch, average=False
     )
     maux_amp.toc()
 
     maux_mamp = tictoc("maux_mamp")
     maux_mamp.tic()
-    est_maux_mamp = maux_tde.maux_tde(
+    est_maux_mamp = AuxTDE.AuxTDE(
         x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch, average=True
     )
     maux_mamp.toc()

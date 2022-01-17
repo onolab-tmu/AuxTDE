@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-import maux_tde
+import AuxTDE
 from functions.tictoc import tictoc
 
 if __name__ == "__main__":
     np.random.seed(577)
 
     # signal parameters
-    l_sig = 2 ** 12
+    l_sig = 2 ** 14
     n_ch = 8
     true_tdoa = 5 * np.random.random(n_ch - 1)
     true_tdoa = np.append(0, true_tdoa)
@@ -27,7 +27,7 @@ if __name__ == "__main__":
         x[:, ch] = np.fft.irfft(tmp)
 
     # main
-    tau = maux_tde.maux_tde(x)
+    tau = AuxTDE.AuxTDE(x)
 
     # result
     print("----------------------------")

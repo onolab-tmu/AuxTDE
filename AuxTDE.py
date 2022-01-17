@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-import aux_tde
-import tde
+import single_AuxTDE
+import TDE
 from functions.STFT import mSTFT
 
 
-def maux_tde(
+def AuxTDE(
     x,
     frlen=None,
     frsft=None,
@@ -192,7 +192,7 @@ def init_tau(x, is_naive=False):
 
     # compute time delay estimates
     for ch in range(1, n_ch):
-        tau[ch], tau_naive[ch] = tde.GCC_with_parafit(
+        tau[ch], tau_naive[ch] = TDE.GCC_with_parafit(
             X[:, 0] * np.conj(X[:, ch]), ret_GCC=True
         )
 
@@ -242,12 +242,12 @@ def auxiliary_function(a, tau, init_tau, A, phi, w):
     return Q
 
 
-def simple_maux_tde(x, frlen=None, n_iter=10, ret_all=False):
+def PW_AuxTDE(x, frlen=None, n_iter=10, ret_all=False):
     n_samples, n_ch = x.shape
     tau = np.zeros([n_ch, n_iter + 1])
     x_2ch = np.zeros([n_samples, 2])
     x_2ch[:, 0] = x[:, 0]
     for ch in range(1, n_ch):
         x_2ch[:, 1] = x[:, ch]
-        tau[ch, :] = aux_tde.aux_tde(x_2ch, frlen, n_iter=n_iter, ret_all=True)
+        tau[ch, :] = single_AuxTDE.AuxTDE(x_2ch, frlen, n_iter=n_iter, ret_all=True)
     return tau if ret_all else tau[:, -1]

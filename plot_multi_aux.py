@@ -7,7 +7,7 @@ import numpy as np
 from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.mplot3d import Axes3D
 
-import maux_tde
+import AuxTDE
 from functions.STFT import mSTFT
 
 
@@ -56,7 +56,7 @@ def cost_function(args):
     y = args[1]
     tau = np.array([0, x, y])
 
-    return maux_tde.cost_function(a, tau, A, phi, w)
+    return AuxTDE.cost_function(a, tau, A, phi, w)
 
 
 def auxiliary_function(args):
@@ -64,7 +64,7 @@ def auxiliary_function(args):
     y = args[1]
     tau = np.array([0, x, y])
 
-    return maux_tde.auxiliary_function(a, tau, init_tau, A, phi, w)
+    return AuxTDE.auxiliary_function(a, tau, init_tau, A, phi, w)
 
 
 def mp_init():
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     # compute variables/parameters
     w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
     w2 = w ** 2
-    V = maux_tde.calc_SCM(X)
+    V = AuxTDE.calc_SCM(X)
     A = np.abs(V)
     phi = np.angle(V / A)
     A /= frlen
