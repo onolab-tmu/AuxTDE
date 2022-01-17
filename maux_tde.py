@@ -10,14 +10,15 @@ def maux_tde(
     x,
     frlen=None,
     frsft=None,
-    n_iter_t=10,
-    n_iter_a=10,
-    n_epoch=1,
+    n_iter_t=5,
+    n_iter_a=5,
+    n_epoch=2,
+    a0=None,
     tau0=None,
-    mean_a=False,
+    average=True,
 ):
     """
-    Auxilliary function based sub-sample time delays estimation.
+    Auxilliary function based estimation of sub-sample time delays.
 
     parameters
     ----------
@@ -33,11 +34,14 @@ def maux_tde(
         The number of iterations for a updates
     n_epoch: int, optional
         The number of epochs for alternating updates of tau and a
+    a0: float, optional
+        The initial estimates of the amplitude.
+        If None, 1 is used for all frequencies.
     tau0: float, optional
-        The initial estimates of the time delay.
+        The initial estimates of the time delays.
         If None, GCC with quadratic interpolation is used.
-    mean_a: bool, optional
-        If true, frequency-independent a is used.
+    average: bool, optional
+        If true, frequency-independent amplitude is estimated.
 
     return
     ----------
@@ -73,108 +77,31 @@ def maux_tde(
 
     ## main
     # initialization
-    a = np.ones([n_freq, n_ch, 1]) / np.sqrt(n_ch)
-    tau = np.zeros([n_iter_t + 1, n_ch])
-    if tau0 is None:
-        tau[-1, :] = init_tau(x)
-    else:
-        tau[-1, :] = tau0
+    tau = init_tau(x) if tau0 is None else tau0
+    a = np.ones([n_freq, n_ch, 1]) / np.sqrt(n_ch) if a0 is None else a0
+    sigma = np.ones([n_ch])
+    f_update_a = update_a_mean if average else update_a_freq
 
     # alternating updates
     for epoch in range(n_epoch):
-        # iterative updates for time delay estimation
-        # use the last estimates of the previous epoch for initialization
-        tau[0, :] = tau[-1, :]
-        for iter in range(1, n_iter_t + 1):
-            tau[iter, 1:] = update_tau(a, tau[iter - 1, :], w, A, phi)
+        weighted_A = A / (sigma[:, np.newaxis] @ sigma[np.newaxis, :])
+
+        # time delay estimation
+        for iter in range(n_iter_t):
+            tau[1:] = update_tau(a, tau, w, A, phi)
 
         # amplitude estimation
-        tmp, J = update_a(tau[-1, :], w, A, phi, n_iter_a, a, mean_a)
-        a = tmp[-1, :, :, :]
+        for iter in range(n_iter_a):
+            a = f_update_a(a, tau, w, A, phi)
+
+        # update sigma
+        sigma = update_sigma(a, tau, X, w)
 
     # deal with the minus time delay
     mask = tau > (n_samples / 2)
     tau -= n_samples * mask
 
-    return tau[-1, :]
-
-
-def maux_tde_retall(
-    x,
-    frlen=None,
-    frsft=None,
-    n_iter_t=10,
-    n_iter_a=10,
-    n_epoch=3,
-    tau0=None,
-    mean_a=False,
-):
-    """
-    maux_tde for analysis purpose
-
-    """
-
-    # Check error and get parameters
-    n_samples, n_ch = x.shape
-    if n_samples < n_ch:
-        x = x.T
-        n_samples, n_ch = x.shape
-
-    if frlen is None:
-        frlen = n_samples
-
-    if frsft is None:
-        frsft = frlen // 2
-
-    # STFT
-    wnd = np.ones(frlen)
-    X = mSTFT(x, frlen, frsft, wnd, zp=False).transpose(2, 0, 1)
-    n_freq, n_ch, n_frame = X.shape
-
-    # compute variables/parameters
-    w = 2.0 * np.pi * np.arange(0, n_freq) / frlen
-    V = calc_SCM(X)
-    A = np.abs(V)
-    phi = np.angle(V / A)
-    A /= frlen
-    A[1:-1, :, :] *= 2
-
-    ## main
-    # initialization
-    a = np.ones([n_epoch + 1, n_iter_a + 1, n_freq, n_ch, 1]) / np.sqrt(n_ch)
-    tau = np.zeros([n_epoch + 1, n_iter_t + 1, n_ch])
-    cost = np.zeros([n_epoch + 1, n_iter_t + n_iter_a + 2])
-    if tau0 is None:
-        tau[0, -1, :] = init_tau(x)
-    else:
-        tau[0, -1, :] = tau0
-    cost[0, -1] = cost_function(a[0, 0, :, :, :], tau[0, -1, :], A, phi, w)
-    print(tau[0, -1, :])
-
-    # main
-    for epoch in range(1, n_epoch + 1):
-        # iterative updates for time delay estimation
-        tau[epoch, 0, :] = tau[epoch - 1, -1, :]
-        current_a = a[epoch - 1, -1, :, :, :]
-        cost[epoch, 0] = cost_function(current_a, tau[epoch, 0, :], A, phi, w)
-        for iter in range(1, n_iter_t + 1):
-            tau[epoch, iter, 1:] = update_tau(
-                current_a, tau[epoch, iter - 1, :], w, A, phi
-            )
-            cost[epoch, iter] = cost_function(current_a, tau[epoch, iter, :], A, phi, w)
-
-        # amplitude estimation
-        a[epoch, :, :, :, :], cost[epoch, n_iter_t + 1 :] = update_a(
-            tau[epoch, -1, :],
-            w,
-            A,
-            phi,
-            n_iter_a,
-            a0=a[epoch - 1, -1, :, :, :],
-            mean_a=mean_a,
-        )
-
-    return a, tau, cost
+    return tau
 
 
 def update_tau(a, tau, w, A, phi):
@@ -203,63 +130,28 @@ def update_tau(a, tau, w, A, phi):
     return retval
 
 
-def update_a(tau, w, A, phi, n_iter, a0=None, mean_a=False):
+def update_a_freq(a, tau, w, A, phi):
     # update auxiliary variables
     tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
     theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
 
-    # update amplitude estimates
-    if mean_a:
-        a, J = mmeig_mean(np.real(A * np.exp(-1 * 1j * theta)), n_iter, a0)
-    else:
-        a, J = mmeig(np.real(A * np.exp(-1 * 1j * theta)), n_iter, a0)
+    # update amplitudes
+    V_prime = np.real(A * np.exp(-1 * 1j * theta))
+    a = max_and_norm(V_prime @ a)
 
-    return a, J
+    return a
 
 
-def mmeig(V, n_iter, a0):
-    n_freq, n_ch = V.shape[0:2]
-    a = np.ones([n_iter + 1, n_freq, n_ch, 1])
+def update_a_mean(a, tau, w, A, phi):
+    # update auxiliary variables
+    tdiff = tau[:, np.newaxis].T - tau[:, np.newaxis]
+    theta = w[:, np.newaxis, np.newaxis] * tdiff[np.newaxis, :, :] + phi
 
-    # initialization
-    if a0 is None:
-        _eig_val, eig_vec = np.linalg.eigh(V)
-        tmp = eig_vec[:, :, -1, np.newaxis] / eig_vec[:, 0, -1, np.newaxis, np.newaxis]
-        a[0, :, :, :] = max_and_norm(tmp)
-    else:
-        a[0, :, :, :] = a0
+    # update amplitudes
+    V_prime = np.mean(np.real(A * np.exp(-1 * 1j * theta)), axis=0)
+    a = max_and_norm(V_prime @ a)
 
-    # updates
-    J = np.zeros(n_iter + 1)
-    J[0] = cost_function_mat(a[0, :, :, :], V)
-    for i in range(1, n_iter + 1):
-        a[i, :, :, :] = max_and_norm(V @ a[i - 1, :, :, :])
-        J[i] = cost_function_mat(a[i, :, :, :], V)
-
-    return a, J
-
-
-def mmeig_mean(V, n_iter, a0):
-    n_freq, n_ch = V.shape[0:2]
-    Vsum = np.sum(V, axis=0) / n_freq
-    a = np.ones([n_iter + 1, n_ch, 1])
-
-    # initialization
-    if a0 is None:
-        _eig_val, eig_vec = np.linalg.eigh(Vsum)
-        tmp = eig_vec[:, -1, np.newaxis] / eig_vec[0, -1, np.newaxis, np.newaxis]
-        a[0, :, :] = max_and_norm2(tmp)
-    else:
-        a[0, :, :] = a0[0, :, :]
-
-    # updates
-    J = np.zeros(n_iter + 1)
-    J[0] = cost_function_mat(a[0, np.newaxis, :, :], V)
-    for i in range(1, n_iter + 1):
-        a[i, :, :] = max_and_norm2(Vsum @ a[i - 1, :, :])
-        J[i] = cost_function_mat(a[i, np.newaxis, :, :], V)
-
-    return a[:, np.newaxis, :, :], J
+    return a
 
 
 def max_and_norm(vec):
@@ -267,9 +159,20 @@ def max_and_norm(vec):
     return vec / np.linalg.norm(vec, axis=1)[:, np.newaxis, :]
 
 
-def max_and_norm2(vec):
-    vec = np.maximum(vec, 1e-10)
-    return vec / np.linalg.norm(vec, axis=0)[np.newaxis, :]
+def update_sigma(a, tau, X, w):
+    g = calcRTF(a, tau, w)
+    tmp = X - g * (g.conj().swapaxes(1, 2) @ X) / (g.conj().swapaxes(1, 2) @ g)
+    tmp2 = np.real(tmp.conj() * tmp)
+    tmp2[1:-1, :, :] *= 2
+    sigma2 = np.mean(tmp2, axis=(0, 2))
+
+    return np.sqrt(sigma2)
+
+
+def calcRTF(a, tau, w):
+    return a * np.exp(
+        -1j * w[:, np.newaxis, np.newaxis] * tau[np.newaxis, :, np.newaxis]
+    )
 
 
 def calc_SCM(X):
