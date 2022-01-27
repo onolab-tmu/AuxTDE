@@ -179,7 +179,7 @@ if __name__ == "__main__":
     colors_2[af <= 0] = "#ff000000"
 
     # plot
-    ax = Axes3D(fig)
+    ax = Axes3D(fig, auto_add_to_figure=False)
     ax.plot_surface(
         X,
         Y,
@@ -214,6 +214,7 @@ if __name__ == "__main__":
     )
 
     ax.view_init(azim=args.azim, elev=args.elev)
+    fig.add_axes(ax)
 
     # save or show
     if args.out_path is not None:
