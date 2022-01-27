@@ -116,18 +116,36 @@ if __name__ == "__main__":
     af = np.ma.masked_where(af < 0, af)
     mask = np.ma.masked_where(af >= 0, af)
 
+    ## plot
+    mm = 1 / 25.4
+    figdpi = 300
+    plt.figure(figsize=(80 * mm, 62 * mm), dpi=figdpi)
+
+    # styles
+    styles = {
+        "xtick.labelsize": 6,
+        "ytick.labelsize": 6,
+        "lines.linewidth": 1,
+        "axes.labelsize": 9,
+        "axes.linewidth": 0.5,
+        "xtick.major.size": 2,
+        "xtick.major.width": 0.5,
+        "ytick.major.size": 2,
+        "ytick.major.width": 0.5,
+    }
+    plt.rcParams.update(styles)
+
     # plot
     plt.plot(tau, cost, color="#0000ff99")
     plt.plot(tau, af, color="#eb3929ff")
     plt.plot(tau, mask, color="#ff000000")
-    plt.xlabel(r"$\tau$", fontsize=20)
-    plt.ylabel("Objective function", fontsize=18)
-    plt.tick_params(labelsize=12)
+    plt.xlabel(r"Time delay $\tau$ [sample]")
+    plt.ylabel("Objective function")
     plt.ylim(0,)
-    plt.subplots_adjust(left=0.15, bottom=0.12)
+    plt.tight_layout()
 
     # save or show
     if args.out_path is not None:
-        fig.savefig(args.out_path, dpi=300)
+        plt.savefig(args.out_path, dpi=figdpi, bbox_inches="tight")
     else:
         plt.show()

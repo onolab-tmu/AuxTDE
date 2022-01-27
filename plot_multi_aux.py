@@ -148,6 +148,28 @@ if __name__ == "__main__":
     af *= af > 0
 
     ## plot
+    mm = 1 / 25.4
+    figdpi = 300
+    fig = plt.figure(figsize=(80 * mm, 62 * mm), dpi=figdpi)
+
+    # styles
+    lfs = 6
+    styles = {
+        "xtick.labelsize": lfs,
+        "ytick.labelsize": lfs,
+        "lines.linewidth": 1,
+        "axes.labelsize": 9,
+        "axes.linewidth": 0.5,
+        "axes.labelpad": -8,
+        "xtick.major.size": 2,
+        "xtick.major.width": 0.5,
+        "xtick.major.pad": -4,
+        "ytick.major.size": 2,
+        "ytick.major.width": 0.5,
+        "grid.linewidth": 0.5,
+    }
+    plt.rcParams.update(styles)
+
     # set colors
     colors_1 = np.full(X.shape, "#0000ff99")
     colors_2 = np.full(X.shape, "#eb3929ff")
@@ -157,9 +179,7 @@ if __name__ == "__main__":
     colors_2[af <= 0] = "#ff000000"
 
     # plot
-    fig = plt.figure(figsize=(7.2, 5.4))
     ax = Axes3D(fig)
-
     ax.plot_surface(
         X,
         Y,
@@ -173,10 +193,14 @@ if __name__ == "__main__":
         X, Y, af, facecolors=colors_2, rcount=args.n_mesh, ccount=args.n_mesh
     )
 
-    ax.set_xlabel(r"$\tau_2$", fontsize=20)
-    ax.set_ylabel(r"$\tau_1$", fontsize=20)
-    ax.set_zlabel("Objective function", fontsize=18, labelpad=-3)
-    ax.tick_params(labelsize=12, pad=-2)
+    # ax.set_xlabel(r"$\tau_2$", fontsize=20)
+    # ax.set_ylabel(r"$\tau_1$", fontsize=20)
+    # ax.set_zlabel("Objective function", fontsize=18, labelpad=-3)
+    # ax.tick_params(labelsize=12, pad=-2)
+
+    ax.set_xlabel(r"$\tau_2$")
+    ax.set_ylabel(r"$\tau_1$")
+    ax.set_zlabel("Objective function")
 
     ax.set_xlim3d([-3, 5])
     ax.set_zlim3d([0, np.amax(cost)])
@@ -186,7 +210,7 @@ if __name__ == "__main__":
     ax.ticklabel_format(style="sci", axis="z", scilimits=(3, 3))
     ax.zaxis.offsetText.set_visible(False)
     ax.text2D(
-        0.97, args.z_label_pos, r"$\times 10^{3}$", transform=ax.transAxes, fontsize=12
+        0.98, args.z_label_pos, r"$\times 10^{3}$", transform=ax.transAxes, fontsize=lfs
     )
 
     ax.view_init(azim=args.azim, elev=args.elev)
