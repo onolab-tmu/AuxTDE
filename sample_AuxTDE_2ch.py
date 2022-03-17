@@ -2,7 +2,6 @@
 import numpy as np
 
 import AuxTDE
-import single_AuxTDE
 from functions.tictoc import tictoc
 
 if __name__ == "__main__":
@@ -11,8 +10,8 @@ if __name__ == "__main__":
     # signal parameters
     l_sig = 2 ** 14
     n_ch = 2
-    true_tdoa = 5 * np.random.random(n_ch - 1)
-    true_tdoa = np.append(0, true_tdoa)
+    true_TD = 5 * np.random.random(n_ch - 1)
+    true_TD = np.append(0, true_TD)
 
     # experimental parameters
     n_iter_t = 10
@@ -29,93 +28,107 @@ if __name__ == "__main__":
     # delayed signals
     amp = np.random.random([l_sig // 2 + 1, n_ch]) + 0.5
     for ch in range(1, n_ch):
-        tmp = amp[:, ch] * np.fft.rfft(x[:, 0]) * np.exp(1j * w * true_tdoa[ch])
+        tmp = amp[:, ch] * np.fft.rfft(x[:, 0]) * np.exp(1j * w * true_TD[ch])
         x[:, ch] = np.fft.irfft(tmp)
 
     # main
-    est_naiv = AuxTDE.init_tau(x, is_naive=True)
-    est_para = AuxTDE.init_tau(x)
+    gcc = tictoc("PW-GCC")
+    gcc.tic()
+    est_gcc = AuxTDE.init_tau(x, is_naive=True)
+    gcc.toc()
 
-    saux = tictoc("saux")
-    saux.tic()
-    est_saux = [0, single_AuxTDE.AuxTDE(x, n_iter=n_iter_t)]
-    saux.toc()
+    parafit = tictoc("PW-Parafit")
+    parafit.tic()
+    est_parafit = AuxTDE.init_tau(x)
+    parafit.toc()
 
-    maux = tictoc("maux")
-    maux.tic()
-    est_maux = AuxTDE.AuxTDE(x, n_iter_t=n_iter_t, n_iter_a=1, n_epoch=1)
-    maux.toc()
+    pw_aux = tictoc("PW-AuxTDE")
+    pw_aux.tic()
+    est_pw_aux = AuxTDE.PW_AuxTDE(x, n_iter=n_iter_t)
+    pw_aux.toc()
 
-    maux_amp = tictoc("maux_amp")
-    maux_amp.tic()
-    est_maux_amp = AuxTDE.AuxTDE(
+    aux_unit = tictoc("AuxTDE_unitAmp")
+    aux_unit.tic()
+    est_aux_unit = AuxTDE.AuxTDE(x, n_iter_t=n_iter_t, n_iter_a=1, n_epoch=1)
+    aux_unit.toc()
+
+    aux_freq = tictoc("AuxTDE_freqAmp")
+    aux_freq.tic()
+    est_aux_freq = AuxTDE.AuxTDE(
         x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch, average=False
     )
-    maux_amp.toc()
+    aux_freq.toc()
 
-    maux_mamp = tictoc("maux_mamp")
-    maux_mamp.tic()
-    est_maux_mamp = AuxTDE.AuxTDE(
+    aux_shrd = tictoc("AuxTDE_shrdAmp")
+    aux_shrd.tic()
+    est_aux_shrd = AuxTDE.AuxTDE(
         x, n_iter_t=n_iter_t, n_iter_a=n_iter_a, n_epoch=n_epoch, average=True
     )
-    maux_mamp.toc()
+    aux_shrd.toc()
 
     # results
     print("----------------------------")
     print(
         (
-            "true_tdoa: {}\n"
-            "est_naiv: {}\n"
-            "est_para: {}\n"
-            "est_saux: {}\n"
-            "est_maux: {}\n"
-            "est_maux_amp: {}\n"
-            "est_maux_mamp: {}"
+            "true_TD: \n{}\n"
+            "est_GCC: \n{}\n"
+            "est_Parafit: \n{}\n"
+            "est_PW-AuxTDE: \n{}\n"
+            "est_AuxTDE_unitAmp: \n{}\n"
+            "est_AuxTDE_freqAmp: \n{}\n"
+            "est_AuxTDE_shrdAmp: \n{}"
         ).format(
-            true_tdoa,
-            est_naiv,
-            est_para,
-            est_saux,
-            est_maux,
-            est_maux_amp,
-            est_maux_mamp,
+            true_TD,
+            est_gcc,
+            est_parafit,
+            est_pw_aux,
+            est_aux_unit,
+            est_aux_freq,
+            est_aux_shrd,
         )
     )
     print("----------------------------")
 
-    err_naiv = np.abs(est_naiv - true_tdoa)
-    err_para = np.abs(est_para - true_tdoa)
-    err_saux = np.abs(est_saux - true_tdoa)
-    err_maux = np.abs(est_maux - true_tdoa)
-    err_maux_amp = np.abs(est_maux_amp - true_tdoa)
-    err_maux_mamp = np.abs(est_maux_mamp - true_tdoa)
+    err_gcc = np.abs(est_gcc - true_TD)
+    err_parafit = np.abs(est_parafit - true_TD)
+    err_pw_aux = np.abs(est_pw_aux - true_TD)
+    err_aux_unit = np.abs(est_aux_unit - true_TD)
+    err_aux_freq = np.abs(est_aux_freq - true_TD)
+    err_aux_shrd = np.abs(est_aux_shrd - true_TD)
     print(
         (
-            "err_naiv: {}\n"
-            "err_para: {}\n"
-            "err_saux: {}\n"
-            "err_maux: {}\n"
-            "err_maux_amp: {}\n"
-            "err_maux_mamp: {}"
-        ).format(err_naiv, err_para, err_saux, err_maux, err_maux_amp, err_maux_mamp)
+            "err_GCC: \n{}\n"
+            "err_Parafit: \n{}\n"
+            "err_PW-AuxTDE: \n{}\n"
+            "err_AuxTDE_unitAmp: \n{}\n"
+            "err_AuxTDE_freqAmp: \n{}\n"
+            "err_AuxTDE_shrdAmp: \n{}"
+        ).format(
+            err_gcc, err_parafit, err_pw_aux, err_aux_unit, err_aux_freq, err_aux_shrd
+        )
     )
 
     print("----------------------------")
-    rmse_naiv = np.sqrt(np.mean(err_naiv ** 2))
-    rmse_para = np.sqrt(np.mean(err_para ** 2))
-    rmse_saux = np.sqrt(np.mean(err_saux ** 2))
-    rmse_maux = np.sqrt(np.mean(err_maux ** 2))
-    rmse_maux_amp = np.sqrt(np.mean(err_maux_amp ** 2))
-    rmse_maux_mamp = np.sqrt(np.mean(err_maux_mamp ** 2))
+    rmse_gcc = np.sqrt(np.mean(err_gcc ** 2))
+    rmse_parafit = np.sqrt(np.mean(err_parafit ** 2))
+    rmse_pw_aux = np.sqrt(np.mean(err_pw_aux ** 2))
+    rmse_aux_unit = np.sqrt(np.mean(err_aux_unit ** 2))
+    rmse_aux_freq = np.sqrt(np.mean(err_aux_freq ** 2))
+    rmse_aux_shrd = np.sqrt(np.mean(err_aux_shrd ** 2))
     print(
         (
-            "rmse_naiv     : {}\n"
-            "rmse_para     : {}\n"
-            "rmse_saux     : {}\n"
-            "rmse_maux     : {}\n"
-            "rmse_maux_amp : {}\n"
-            "rmse_maux_mamp: {}"
+            "RMSE_GCC:            {}\n"
+            "RMSE_Parafit:        {}\n"
+            "RMSE_PW-AuxTDE:      {}\n"
+            "RMSE_AuxTDE_unitAmp: {}\n"
+            "RMSE_AuxTDE_freqAmp: {}\n"
+            "RMSE_AuxTDE_shrdAmp: {}"
         ).format(
-            rmse_naiv, rmse_para, rmse_saux, rmse_maux, rmse_maux_amp, rmse_maux_mamp
+            rmse_gcc,
+            rmse_parafit,
+            rmse_pw_aux,
+            rmse_aux_unit,
+            rmse_aux_freq,
+            rmse_aux_shrd,
         )
     )
