@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 "STFT: Package for short-time Fourier Transform"
 import numpy as np
-import librosa
 import matplotlib.pyplot as plt
 
 
@@ -208,37 +207,3 @@ def sync_wnd(wnd, frsft):
 
 def truncate(sig, ref):
     return sig[: ref.shape[0]] if sig.ndim == 1 else sig[:, : ref.shape[0]]
-
-
-if __name__ == "__main__":
-    """
-    This is an entry point and a test script
-    when you execute this module as a script.
-    """
-
-    # set parameters
-    fs = 16000
-    frlen = 1024 * 4
-    frsft = frlen // 2
-    wnd = np.hamming(frlen)
-    zp = True
-
-    # test
-    sig, fs = librosa.load(
-        "/home/kouei/data/SiSEC/UND/dev1/dev1_female3_liverec_130ms_5cm_sim_1.wav",
-        sr=fs,
-        mono=True,
-    )
-
-    SIG = mSTFT(sig, frlen, frsft, wnd, zp)
-    rsig = truncate(miSTFT(SIG, frsft, wnd, zp), sig)
-    sig = np.squeeze(sig)
-    print("RMSE: {}".format(np.sqrt(np.mean((sig - rsig) ** 2))))
-    print(
-        "correct RMSE: {}".format(
-            np.sqrt(np.mean((sig - np.fft.irfft(np.fft.rfft(sig))) ** 2))
-        )
-    )
-
-    plt.plot(sig - rsig)
-    plt.show()
