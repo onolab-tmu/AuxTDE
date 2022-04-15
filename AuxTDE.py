@@ -77,8 +77,8 @@ def AuxTDE(
 
     ## main
     # initialization
-    tau = init_tau(x) if tau0 is None else tau0
-    a = np.ones([n_freq, n_ch, 1]) / np.sqrt(n_ch) if a0 is None else a0
+    tau = init_tau(x) if tau0 is None else np.copy(tau0)
+    a = np.ones([n_freq, n_ch, 1]) / np.sqrt(n_ch) if a0 is None else np.copy(a0)
     sigma = np.ones([n_ch])
     f_update_a = update_a_mean if average else update_a_freq
 
