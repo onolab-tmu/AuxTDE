@@ -88,11 +88,11 @@ def AuxTDE(
 
         # time delay estimation
         for iter in range(n_iter_t):
-            tau[1:] = update_tau(a, tau, w, A, phi)
+            tau[1:] = update_tau(a, tau, w, weighted_A, phi)
 
         # amplitude estimation
         for iter in range(n_iter_a):
-            a = f_update_a(a, tau, w, A, phi)
+            a = f_update_a(a, tau, w, weighted_A, phi)
 
         # update sigma
         sigma = update_sigma(a, tau, X, w)
