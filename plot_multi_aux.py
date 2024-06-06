@@ -67,12 +67,6 @@ def auxiliary_function(args):
     return AuxTDE.auxiliary_function(a, tau, init_tau, A, phi, w)
 
 
-def mp_init():
-    import mkl
-
-    mkl.set_num_threads(1)
-
-
 if __name__ == "__main__":
     np.random.seed(577)
     args = parse_cmd_line_arguments()
@@ -129,7 +123,7 @@ if __name__ == "__main__":
 
     # compute objective function
     cost = np.zeros([n_row, n_col])
-    with Pool(args.n_worker, initializer=mp_init) as p:
+    with Pool(args.n_worker) as p:
         cost = p.map(cost_function, list(zip(np.ravel(X), np.ravel(Y))))
     cost = np.array(cost).reshape(n_col, n_row)
 
@@ -142,7 +136,7 @@ if __name__ == "__main__":
 
     # compute auxiliary function
     af = np.zeros([n_row, n_col])
-    with Pool(args.n_worker, initializer=mp_init) as p:
+    with Pool(args.n_worker) as p:
         af = p.map(auxiliary_function, list(zip(np.ravel(X), np.ravel(Y))))
     af = np.array(af).reshape(n_col, n_row)
     af *= af > 0
